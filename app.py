@@ -3,13 +3,17 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 
+# ----------------------------------
+# Page Setup
+# ----------------------------------
+
 st.set_page_config(page_title="Uilkie Penny Lotto Scanner", layout="wide")
 
 st.title("🚀 Uilkie Penny Lotto Scanner")
-st.write("Live Momentum Mode | Price < $10 | API-Based (No Scraping)")
+st.write("Live Momentum Mode | Price < $10 | Batch API Version")
 
 # ----------------------------------
-# Starter Universe (Expand Later)
+# Ticker Universe (Expand Later)
 # ----------------------------------
 
 TICKERS = [
@@ -18,6 +22,10 @@ TICKERS = [
     "HOOD","QS","UPST","AFRM","SNDL","TLRY","MULN","BBIG",
     "XPEV","CHPT","WKHS","CLOV","SPCE","PENN","RUN"
 ]
+
+# ----------------------------------
+# RSI Function
+# ----------------------------------
 
 def calculate_rsi(series, period=14):
     delta = series.diff()
@@ -28,15 +36,29 @@ def calculate_rsi(series, period=14):
     rs = avg_gain / avg_loss
     return 100 - (100 / (1 + rs))
 
+# ----------------------------------
+# Scanner
+# ----------------------------------
+
 if st.button("Run Lotto Scan"):
 
     results = []
-    progress = st.progress(0)
-    total = len(TICKERS)
 
-    for i, ticker in enumerate(TICKERS):
+    try:
+        data = yf.download(
+            TICKERS,
+            period="5d",
+            interval="1d",
+            group_by="ticker",
+            progress=False
+        )
+    except:
+        st.error("Data download failed.")
+        st.stop()
+
+    for ticker in TICKERS:
         try:
-            df = yf.download(ticker, period="5d", interval="1d", progress=False)
+            df = data[ticker]
 
             if df.empty or len(df) < 2:
                 continue
@@ -49,12 +71,12 @@ if st.button("Run Lotto Scan"):
 
             percent_change = ((price - prev_close) / prev_close) * 100
 
-            if percent_change < 5:  # Only strong gainers
+            if percent_change < 3:
                 continue
 
             rsi = calculate_rsi(df["Close"]).iloc[-1]
 
-            if rsi > 50:
+            if rsi > 45:
                 results.append({
                     "Ticker": ticker,
                     "Price": round(float(price), 2),
@@ -66,8 +88,6 @@ if st.button("Run Lotto Scan"):
         except:
             continue
 
-        progress.progress((i + 1) / total)
-
     if results:
         df_results = pd.DataFrame(results).sort_values(by="% Change", ascending=False)
         st.success(f"Found {len(results)} momentum setups")
@@ -76,4 +96,4 @@ if st.button("Run Lotto Scan"):
         st.warning("No momentum setups found.")
 
 st.markdown("---")
-st.caption("Uilkie Alpha Fund | API Safe Mode")
+st.caption("Uilkie Alpha Fund | Stable Batch Scanner")
