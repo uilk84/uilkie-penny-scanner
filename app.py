@@ -6,22 +6,18 @@ import numpy as np
 st.set_page_config(page_title="Uilkie Penny Lotto Scanner", layout="wide")
 
 st.title("🚀 Uilkie Penny Lotto Scanner")
-st.write("Live Yahoo Top Gainers | Price < $10 | Momentum Breakouts")
+st.write("Live Momentum Mode | Price < $10 | API-Based (No Scraping)")
 
-# -----------------------------
-# Get Yahoo Top Gainers
-# -----------------------------
+# ----------------------------------
+# Starter Universe (Expand Later)
+# ----------------------------------
 
-@st.cache_data(ttl=300)
-def get_top_gainers():
-    url = "https://finance.yahoo.com/markets/stocks/gainers/"
-    tables = pd.read_html(url)
-    df = tables[0]
-    return df["Symbol"].dropna().tolist()
-
-# -----------------------------
-# RSI Function
-# -----------------------------
+TICKERS = [
+    "AAPL","MSFT","NVDA","AMD","TSLA","PLTR","SOFI","LCID","RIVN",
+    "F","T","NIO","BB","AMC","GME","MARA","RIOT","NKLA","OPEN",
+    "HOOD","QS","UPST","AFRM","SNDL","TLRY","MULN","BBIG",
+    "XPEV","CHPT","WKHS","CLOV","SPCE","PENN","RUN"
+]
 
 def calculate_rsi(series, period=14):
     delta = series.diff()
@@ -32,46 +28,39 @@ def calculate_rsi(series, period=14):
     rs = avg_gain / avg_loss
     return 100 - (100 / (1 + rs))
 
-# -----------------------------
-# Scanner
-# -----------------------------
-
 if st.button("Run Lotto Scan"):
 
-    tickers = get_top_gainers()
     results = []
     progress = st.progress(0)
-    total = len(tickers)
+    total = len(TICKERS)
 
-    for i, ticker in enumerate(tickers):
+    for i, ticker in enumerate(TICKERS):
         try:
-            df = yf.download(ticker, period="1mo", interval="1d", progress=False)
+            df = yf.download(ticker, period="5d", interval="1d", progress=False)
 
-            if df.empty or len(df) < 20:
+            if df.empty or len(df) < 2:
                 continue
 
             price = df["Close"].iloc[-1]
+            prev_close = df["Close"].iloc[-2]
 
-            # Penny filter
             if price > 10:
                 continue
 
-            volume = df["Volume"].iloc[-1]
-            avg_volume = df["Volume"].rolling(20).mean().iloc[-1]
-            rel_volume = volume / avg_volume if avg_volume > 0 else 0
+            percent_change = ((price - prev_close) / prev_close) * 100
+
+            if percent_change < 5:  # Only strong gainers
+                continue
 
             rsi = calculate_rsi(df["Close"]).iloc[-1]
 
-            high_5 = df["High"].rolling(5).max().iloc[-2]
-            breakout = price > high_5
-
-            if breakout and rel_volume > 1.5 and rsi > 50:
+            if rsi > 50:
                 results.append({
                     "Ticker": ticker,
                     "Price": round(float(price), 2),
+                    "% Change": round(float(percent_change), 2),
                     "RSI": round(float(rsi), 2),
-                    "Rel Volume": round(float(rel_volume), 2),
-                    "Signal": "🚀 LOTTO MOMENTUM"
+                    "Signal": "🚀 MOMENTUM GAINER"
                 })
 
         except:
@@ -80,10 +69,11 @@ if st.button("Run Lotto Scan"):
         progress.progress((i + 1) / total)
 
     if results:
-        st.success(f"Found {len(results)} lotto setups")
-        st.dataframe(pd.DataFrame(results))
+        df_results = pd.DataFrame(results).sort_values(by="% Change", ascending=False)
+        st.success(f"Found {len(results)} momentum setups")
+        st.dataframe(df_results)
     else:
-        st.warning("No lotto setups found.")
+        st.warning("No momentum setups found.")
 
 st.markdown("---")
-st.caption("Uilkie Alpha Fund | Live Gainers Mode")
+st.caption("Uilkie Alpha Fund | API Safe Mode")
