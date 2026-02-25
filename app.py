@@ -3,33 +3,25 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 
-# -------------------------------
-# Page Setup
-# -------------------------------
-
 st.set_page_config(page_title="Uilkie Penny Lotto Scanner", layout="wide")
 
 st.title("🚀 Uilkie Penny Lotto Scanner")
-st.write("NASDAQ + NYSE | Price < $10 | Breakout + Momentum")
+st.write("Live Yahoo Top Gainers | Price < $10 | Momentum Breakouts")
 
-# -------------------------------
-# Static Ticker List (Stable)
-# -------------------------------
+# -----------------------------
+# Get Yahoo Top Gainers
+# -----------------------------
 
-@st.cache_data
-def load_tickers():
-    return [
-        "AAPL","MSFT","NVDA","AMD","TSLA","PLTR","SOFI","LCID","RIVN",
-        "F","T","NIO","BB","AMC","GME","MARA","RIOT","NKLA","OPEN",
-        "HOOD","QS","UPST","AFRM","SNDL","TLRY","MULN","BBIG",
-        "XPEV","CHPT","WKHS","CLOV","SPCE","PENN","RUN"
-    ]
+@st.cache_data(ttl=300)
+def get_top_gainers():
+    url = "https://finance.yahoo.com/markets/stocks/gainers/"
+    tables = pd.read_html(url)
+    df = tables[0]
+    return df["Symbol"].dropna().tolist()
 
-tickers = load_tickers()
-
-# -------------------------------
+# -----------------------------
 # RSI Function
-# -------------------------------
+# -----------------------------
 
 def calculate_rsi(series, period=14):
     delta = series.diff()
@@ -40,12 +32,13 @@ def calculate_rsi(series, period=14):
     rs = avg_gain / avg_loss
     return 100 - (100 / (1 + rs))
 
-# -------------------------------
-# Scan Button
-# -------------------------------
+# -----------------------------
+# Scanner
+# -----------------------------
 
 if st.button("Run Lotto Scan"):
 
+    tickers = get_top_gainers()
     results = []
     progress = st.progress(0)
     total = len(tickers)
@@ -59,6 +52,7 @@ if st.button("Run Lotto Scan"):
 
             price = df["Close"].iloc[-1]
 
+            # Penny filter
             if price > 10:
                 continue
 
@@ -92,4 +86,4 @@ if st.button("Run Lotto Scan"):
         st.warning("No lotto setups found.")
 
 st.markdown("---")
-st.caption("Uilkie Alpha Fund | Penny Lotto Mode")
+st.caption("Uilkie Alpha Fund | Live Gainers Mode")
