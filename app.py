@@ -3,20 +3,32 @@ import requests
 import pandas as pd
 import os
 
+# ----------------------------------
+# PAGE CONFIG
+# ----------------------------------
+
 st.set_page_config(page_title="Uilkie Penny Lotto Scanner", layout="wide")
 
 st.title("🚀 Uilkie Penny Lotto Scanner")
-st.write("FULL PENNY LOTTO CHAOS MODE | Under $5 | High Momentum")
+st.write("FULL PENNY LOTTO CHAOS MODE | Under $5 | Polygon Gainers Endpoint")
+
+# ----------------------------------
+# LOAD API KEY
+# ----------------------------------
 
 API_KEY = os.getenv("POLYGON_API_KEY")
 
 if not API_KEY:
-    st.error("Polygon API key not found.")
+    st.error("Polygon API key not found. Add POLYGON_API_KEY in Render → Environment.")
     st.stop()
+
+# ----------------------------------
+# SCAN BUTTON
+# ----------------------------------
 
 if st.button("Run Lotto Scan"):
 
-    url = f"https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers?apiKey={API_KEY}"
+    url = f"https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/gainers?apiKey={API_KEY}"
 
     try:
         response = requests.get(url)
@@ -31,16 +43,11 @@ if st.button("Run Lotto Scan"):
     for t in tickers:
         try:
             price = t["lastTrade"]["p"]
-            prev_close = t["prevDay"]["c"]
+            percent_change = t.get("todaysChangePerc", 0)
             volume = t["day"]["v"]
 
-            if prev_close == 0:
-                continue
-
-            percent_change = ((price - prev_close) / prev_close) * 100
-
             # 🔥 CHAOS FILTER
-            if price < 5 and percent_change > 3:
+            if price < 5:
                 results.append({
                     "Ticker": t["ticker"],
                     "Price": round(price, 3),
@@ -56,9 +63,9 @@ if st.button("Run Lotto Scan"):
         df = df.sort_values(by="% Change", ascending=False)
 
         st.success(f"🔥 Found {len(df)} Penny Lotto Movers")
-        st.dataframe(df.head(50))
+        st.dataframe(df)
     else:
         st.warning("No penny lotto runners detected right now.")
 
 st.markdown("---")
-st.caption("Uilkie Alpha Fund | Chaos Mode | Polygon Snapshot API")
+st.caption("Uilkie Alpha Fund | Chaos Mode | Polygon Gainers API")
