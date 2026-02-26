@@ -2,15 +2,16 @@ import streamlit as st
 import requests
 import pandas as pd
 import os
+from datetime import datetime
 
 # ----------------------------------
-# PAGE CONFIG
+# PAGE SETUP
 # ----------------------------------
 
 st.set_page_config(page_title="Uilkie Penny Lotto Scanner", layout="wide")
 
 st.title("🚀 Uilkie Penny Lotto Scanner")
-st.write("FULL PENNY LOTTO CHAOS MODE | Under $5 | Polygon Gainers Endpoint")
+st.write("FULL MARKET SCAN | Under $5 | Real Momentum Mode")
 
 # ----------------------------------
 # LOAD API KEY
@@ -28,29 +29,37 @@ if not API_KEY:
 
 if st.button("Run Lotto Scan"):
 
-    url = f"https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/gainers?apiKey={API_KEY}"
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    url = f"https://api.polygon.io/v2/aggs/grouped/locale/us/market/stocks/{today}?adjusted=true&apiKey={API_KEY}"
 
     try:
         response = requests.get(url)
         data = response.json()
-        tickers = data.get("tickers", [])
+        results_data = data.get("results", [])
     except:
         st.error("Polygon API request failed.")
         st.stop()
 
-    results = []
+    lotto_results = []
 
-    for t in tickers:
+    for stock in results_data:
         try:
-            price = t["lastTrade"]["p"]
-            percent_change = t.get("todaysChangePerc", 0)
-            volume = t["day"]["v"]
+            ticker = stock["T"]
+            close = stock["c"]
+            open_price = stock["o"]
+            volume = stock["v"]
 
-            # 🔥 CHAOS FILTER
-            if price < 5:
-                results.append({
-                    "Ticker": t["ticker"],
-                    "Price": round(price, 3),
+            if open_price == 0:
+                continue
+
+            percent_change = ((close - open_price) / open_price) * 100
+
+            # 🔥 PENNY LOTTO FILTER
+            if close < 5 and percent_change > 2:
+                lotto_results.append({
+                    "Ticker": ticker,
+                    "Price": round(close, 3),
                     "% Change": round(percent_change, 2),
                     "Volume": volume
                 })
@@ -58,14 +67,14 @@ if st.button("Run Lotto Scan"):
         except:
             continue
 
-    if results:
-        df = pd.DataFrame(results)
+    if lotto_results:
+        df = pd.DataFrame(lotto_results)
         df = df.sort_values(by="% Change", ascending=False)
 
         st.success(f"🔥 Found {len(df)} Penny Lotto Movers")
-        st.dataframe(df)
+        st.dataframe(df.head(50))
     else:
         st.warning("No penny lotto runners detected right now.")
 
 st.markdown("---")
-st.caption("Uilkie Alpha Fund | Chaos Mode | Polygon Gainers API")
+st.caption("Uilkie Alpha Fund | Full Market Scan | Polygon Grouped Aggregates")
