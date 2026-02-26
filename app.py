@@ -3,28 +3,16 @@ import requests
 import pandas as pd
 import os
 
-# ----------------------------------
-# Page Setup
-# ----------------------------------
-
 st.set_page_config(page_title="Uilkie Penny Lotto Scanner", layout="wide")
 
 st.title("🚀 Uilkie Penny Lotto Scanner")
-st.write("Full Market | Polygon Snapshot API | No Scraping")
-
-# ----------------------------------
-# Load API Key From Render Environment
-# ----------------------------------
+st.write("FULL PENNY LOTTO CHAOS MODE | Under $5 | High Momentum")
 
 API_KEY = os.getenv("POLYGON_API_KEY")
 
 if not API_KEY:
-    st.error("Polygon API key not found. Add POLYGON_API_KEY in Render → Environment.")
+    st.error("Polygon API key not found.")
     st.stop()
-
-# ----------------------------------
-# Scanner
-# ----------------------------------
 
 if st.button("Run Lotto Scan"):
 
@@ -33,11 +21,10 @@ if st.button("Run Lotto Scan"):
     try:
         response = requests.get(url)
         data = response.json()
+        tickers = data.get("tickers", [])
     except:
         st.error("Polygon API request failed.")
         st.stop()
-
-    tickers = data.get("tickers", [])
 
     results = []
 
@@ -47,13 +34,16 @@ if st.button("Run Lotto Scan"):
             prev_close = t["prevDay"]["c"]
             volume = t["day"]["v"]
 
+            if prev_close == 0:
+                continue
+
             percent_change = ((price - prev_close) / prev_close) * 100
 
-            # Filters
-            if price < 10 and percent_change > 2 and volume > 200000:
+            # 🔥 CHAOS FILTER
+            if price < 5 and percent_change > 3:
                 results.append({
                     "Ticker": t["ticker"],
-                    "Price": round(price, 2),
+                    "Price": round(price, 3),
                     "% Change": round(percent_change, 2),
                     "Volume": volume
                 })
@@ -65,10 +55,10 @@ if st.button("Run Lotto Scan"):
         df = pd.DataFrame(results)
         df = df.sort_values(by="% Change", ascending=False)
 
-        st.success(f"Found {len(df)} momentum setups")
-        st.dataframe(df.head(25))
+        st.success(f"🔥 Found {len(df)} Penny Lotto Movers")
+        st.dataframe(df.head(50))
     else:
-        st.warning("No momentum setups found.")
+        st.warning("No penny lotto runners detected right now.")
 
 st.markdown("---")
-st.caption("Uilkie Alpha Fund | Polygon Powered | Production Mode")
+st.caption("Uilkie Alpha Fund | Chaos Mode | Polygon Snapshot API")
