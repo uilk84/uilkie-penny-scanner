@@ -1,89 +1,91 @@
 import streamlit as st
-import requests
+import yfinance as yf
 import pandas as pd
-import os
+import requests
 from datetime import datetime
 import pytz
 
-st.set_page_config(page_title="Uilkie Chaos Engine (Free Mode)", layout="wide")
-st.title("🚀 Uilkie Penny Lotto Chaos Engine — Free Mode")
-
-API_KEY = os.getenv("POLYGON_API_KEY")
-
-if not API_KEY:
-    st.error("Missing POLYGON_API_KEY")
-    st.stop()
+st.set_page_config(page_title="Uilkie Yahoo Chaos Engine", layout="wide")
+st.title("🚀 Uilkie Penny Lotto Chaos Engine — Yahoo Mode")
 
 eastern = pytz.timezone("US/Eastern")
 now = datetime.now(eastern)
-today = now.strftime("%Y-%m-%d")
 
 # -----------------------------
-# STEP 1: Get Top Gainers
+# STEP 1: Pull Yahoo Market Movers
 # -----------------------------
 
-gainers_url = f"https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/gainers?apiKey={API_KEY}"
-r = requests.get(gainers_url)
+def get_yahoo_movers():
+    url = "https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved"
+    params = {
+        "scrIds": "day_gainers",
+        "count": 50
+    }
+    r = requests.get(url, params=params)
+    data = r.json()
+    quotes = data["finance"]["result"][0]["quotes"]
+    return [q["symbol"] for q in quotes]
 
-if r.status_code != 200:
-    st.error("Failed to pull top gainers.")
-    st.write(r.text)
+try:
+    movers = get_yahoo_movers()
+except:
+    st.error("Failed to pull Yahoo movers.")
     st.stop()
 
-gainers = r.json().get("tickers", [])
-
-if not gainers:
-    st.info("No gainers returned.")
+if not movers:
+    st.info("No movers returned.")
     st.stop()
 
-# Filter under $5
+# -----------------------------
+# STEP 2: Filter Under $5
+# -----------------------------
+
 candidates = []
 
-for g in gainers:
+for symbol in movers:
     try:
-        price = g["lastTrade"]["p"]
+        ticker = yf.Ticker(symbol)
+        price = ticker.history(period="1d")["Close"].iloc[-1]
         if 0.20 <= price <= 5:
-            candidates.append(g["ticker"])
+            candidates.append(symbol)
     except:
         continue
 
 if not candidates:
-    st.info("No lotto candidates among gainers.")
+    st.info("No lotto candidates under $5.")
     st.stop()
 
 # -----------------------------
-# STEP 2: Breakout Engine
+# STEP 3: Breakout + Volume Acceleration
 # -----------------------------
 
 chaos_hits = []
 
-for ticker in candidates[:20]:
+for symbol in candidates[:20]:
+    try:
+        data = yf.download(symbol, period="1d", interval="5m", progress=False)
+        if data.empty or len(data) < 6:
+            continue
 
-    intraday_url = f"https://api.polygon.io/v2/aggs/ticker/{ticker}/range/5/minute/{today}/{today}?adjusted=true&apiKey={API_KEY}"
-    r = requests.get(intraday_url)
-    bars = r.json().get("results", [])
+        data["AvgVol"] = data["Volume"].rolling(5).mean()
 
-    if not bars or len(bars) < 6:
+        latest = data.iloc[-1]
+        previous = data.iloc[:-1]
+
+        breakout = latest["High"] > previous["High"].max()
+        vol_spike = latest["Volume"] > (latest["AvgVol"] * 3)
+        expansion = (latest["Close"] - latest["Open"]) / latest["Open"] > 0.03
+
+        if breakout and vol_spike and expansion:
+            chaos_hits.append({
+                "Ticker": symbol,
+                "Price": round(latest["Close"], 3),
+                "5m Move %": round(((latest["Close"] - latest["Open"]) / latest["Open"]) * 100, 2),
+                "Volume": int(latest["Volume"])
+            })
+
+    except:
         continue
-
-    df = pd.DataFrame(bars)
-    df = df.rename(columns={"c":"Close","o":"Open","h":"High","v":"Volume"})
-    df["AvgVol"] = df["Volume"].rolling(5).mean()
-
-    latest = df.iloc[-1]
-    previous = df.iloc[:-1]
-
-    breakout = latest["High"] > previous["High"].max()
-    vol_spike = latest["Volume"] > (latest["AvgVol"] * 3)
-    expansion = (latest["Close"] - latest["Open"]) / latest["Open"] > 0.03
-
-    if breakout and vol_spike and expansion:
-        chaos_hits.append({
-            "Ticker": ticker,
-            "Price": round(latest["Close"], 3),
-            "5m Move %": round(((latest["Close"] - latest["Open"]) / latest["Open"]) * 100, 2),
-            "Volume": int(latest["Volume"])
-        })
 
 # -----------------------------
 # DISPLAY
@@ -96,4 +98,4 @@ else:
     st.info("No confirmed breakouts right now.")
 
 st.markdown("---")
-st.caption("Free Plan Mode | Scanning Top Gainers Only")
+st.caption("Yahoo Finance Powered | Free Mode | Breakout + Volume Engine")
