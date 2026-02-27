@@ -5,8 +5,8 @@ import os
 from datetime import datetime
 import pytz
 
-st.set_page_config(page_title="Uilkie Chaos Engine v3", layout="wide")
-st.title("🚀 Uilkie Penny Lotto Chaos Engine v3")
+st.set_page_config(page_title="Uilkie Chaos Engine (Free Mode)", layout="wide")
+st.title("🚀 Uilkie Penny Lotto Chaos Engine — Free Mode")
 
 API_KEY = os.getenv("POLYGON_API_KEY")
 
@@ -19,43 +19,45 @@ now = datetime.now(eastern)
 today = now.strftime("%Y-%m-%d")
 
 # -----------------------------
-# SNAPSHOT UNIVERSE
+# STEP 1: Get Top Gainers
 # -----------------------------
 
-snapshot_url = f"https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/tickers?apiKey={API_KEY}"
-r = requests.get(snapshot_url)
-tickers_data = r.json().get("tickers", [])
+gainers_url = f"https://api.polygon.io/v2/snapshot/locale/us/markets/stocks/gainers?apiKey={API_KEY}"
+r = requests.get(gainers_url)
 
-if not tickers_data:
-    st.warning("No snapshot data available.")
+if r.status_code != 200:
+    st.error("Failed to pull top gainers.")
+    st.write(r.text)
     st.stop()
 
-# Filter lotto universe
+gainers = r.json().get("tickers", [])
+
+if not gainers:
+    st.info("No gainers returned.")
+    st.stop()
+
+# Filter under $5
 candidates = []
 
-for t in tickers_data:
+for g in gainers:
     try:
-        price = t["lastTrade"]["p"]
-        volume = t["day"]["v"]
-
-        if 0.20 <= price <= 5 and volume > 300000:
-            candidates.append(t["ticker"])
+        price = g["lastTrade"]["p"]
+        if 0.20 <= price <= 5:
+            candidates.append(g["ticker"])
     except:
         continue
 
-candidates = candidates[:30]
-
 if not candidates:
-    st.info("No lotto candidates right now.")
+    st.info("No lotto candidates among gainers.")
     st.stop()
 
 # -----------------------------
-# BREAKOUT + ACCELERATION ENGINE
+# STEP 2: Breakout Engine
 # -----------------------------
 
 chaos_hits = []
 
-for ticker in candidates:
+for ticker in candidates[:20]:
 
     intraday_url = f"https://api.polygon.io/v2/aggs/ticker/{ticker}/range/5/minute/{today}/{today}?adjusted=true&apiKey={API_KEY}"
     r = requests.get(intraday_url)
@@ -66,7 +68,6 @@ for ticker in candidates:
 
     df = pd.DataFrame(bars)
     df = df.rename(columns={"c":"Close","o":"Open","h":"High","v":"Volume"})
-
     df["AvgVol"] = df["Volume"].rolling(5).mean()
 
     latest = df.iloc[-1]
@@ -95,4 +96,4 @@ else:
     st.info("No confirmed breakouts right now.")
 
 st.markdown("---")
-st.caption("Uilkie Alpha Fund | Snapshot + 5m Breakout Engine")
+st.caption("Free Plan Mode | Scanning Top Gainers Only")
