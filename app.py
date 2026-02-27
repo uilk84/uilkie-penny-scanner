@@ -1,101 +1,73 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import requests
 from datetime import datetime
-import pytz
 
-st.set_page_config(page_title="Uilkie Yahoo Chaos Engine", layout="wide")
-st.title("🚀 Uilkie Penny Lotto Chaos Engine — Yahoo Mode")
+st.set_page_config(page_title="Uilkie Signal Tracker", layout="wide")
 
-eastern = pytz.timezone("US/Eastern")
-now = datetime.now(eastern)
+st.title("📊 Uilkie Signal Tracker")
 
-# -----------------------------
-# STEP 1: Pull Yahoo Market Movers
-# -----------------------------
+if "trades" not in st.session_state:
+    st.session_state.trades = []
 
-def get_yahoo_movers():
-    url = "https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved"
-    params = {
-        "scrIds": "day_gainers",
-        "count": 50
-    }
-    r = requests.get(url, params=params)
-    data = r.json()
-    quotes = data["finance"]["result"][0]["quotes"]
-    return [q["symbol"] for q in quotes]
+# -------------------------
+# Add New Trade
+# -------------------------
 
-try:
-    movers = get_yahoo_movers()
-except:
-    st.error("Failed to pull Yahoo movers.")
-    st.stop()
+st.subheader("➕ Add New Signal")
 
-if not movers:
-    st.info("No movers returned.")
-    st.stop()
+col1, col2 = st.columns(2)
 
-# -----------------------------
-# STEP 2: Filter Under $5
-# -----------------------------
+with col1:
+    ticker = st.text_input("Ticker").upper()
 
-candidates = []
+with col2:
+    entry_price = st.number_input("Entry Price", min_value=0.0, step=0.01)
 
-for symbol in movers:
-    try:
-        ticker = yf.Ticker(symbol)
-        price = ticker.history(period="1d")["Close"].iloc[-1]
-        if 0.20 <= price <= 5:
-            candidates.append(symbol)
-    except:
-        continue
+if st.button("Track Signal"):
+    if ticker and entry_price > 0:
+        st.session_state.trades.append({
+            "Ticker": ticker,
+            "Entry": entry_price,
+            "Time": datetime.now()
+        })
 
-if not candidates:
-    st.info("No lotto candidates under $5.")
-    st.stop()
+# -------------------------
+# Display Active Trades
+# -------------------------
 
-# -----------------------------
-# STEP 3: Breakout + Volume Acceleration
-# -----------------------------
+st.subheader("🔥 Active Signals")
 
-chaos_hits = []
+if not st.session_state.trades:
+    st.info("No signals tracked yet.")
+else:
+    updated_trades = []
 
-for symbol in candidates[:20]:
-    try:
-        data = yf.download(symbol, period="1d", interval="5m", progress=False)
-        if data.empty or len(data) < 6:
-            continue
+    for trade in st.session_state.trades:
+        try:
+            data = yf.Ticker(trade["Ticker"])
+            price = data.history(period="1d")["Close"].iloc[-1]
 
-        data["AvgVol"] = data["Volume"].rolling(5).mean()
+            pct_move = ((price - trade["Entry"]) / trade["Entry"]) * 100
 
-        latest = data.iloc[-1]
-        previous = data.iloc[:-1]
-
-        breakout = latest["High"] > previous["High"].max()
-        vol_spike = latest["Volume"] > (latest["AvgVol"] * 3)
-        expansion = (latest["Close"] - latest["Open"]) / latest["Open"] > 0.03
-
-        if breakout and vol_spike and expansion:
-            chaos_hits.append({
-                "Ticker": symbol,
-                "Price": round(latest["Close"], 3),
-                "5m Move %": round(((latest["Close"] - latest["Open"]) / latest["Open"]) * 100, 2),
-                "Volume": int(latest["Volume"])
+            updated_trades.append({
+                "Ticker": trade["Ticker"],
+                "Entry": trade["Entry"],
+                "Current Price": round(price, 3),
+                "% Move": round(pct_move, 2),
+                "Tracked At": trade["Time"].strftime("%H:%M:%S")
             })
 
-    except:
-        continue
+        except:
+            continue
 
-# -----------------------------
-# DISPLAY
-# -----------------------------
+    df = pd.DataFrame(updated_trades)
 
-if chaos_hits:
-    st.success("🚨 CHAOS BREAKOUT DETECTED")
-    st.dataframe(pd.DataFrame(chaos_hits))
-else:
-    st.info("No confirmed breakouts right now.")
+    if not df.empty:
+        df = df.sort_values(by="% Move", ascending=False)
+        st.dataframe(df, use_container_width=True)
+    else:
+        st.warning("Unable to pull live prices.")
 
 st.markdown("---")
-st.caption("Yahoo Finance Powered | Free Mode | Breakout + Volume Engine")
+st.caption("Uilkie Alpha Fund | Manual Signal Performance Tracker")
